@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Calificaciones</title>
+    <style>
+        :root {
+            --Color-base: #005A9C;
+            --Aprobado-fondo: #d4edda;
+            --Aprobado: #155724;
+            --Reprobado-fondo: #f8d7da;
+            --Reprobado: #721c24;
+            --Border: #ddd;
+            --Error: #a94442;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 2px solid var(--Color-base);
+            margin-bottom: 2em;
+            padding-bottom: 1em;
+        }
+
+        h1, h2 {
+            color: var(--Color-base);
+        }
+
+
+        #Agregar-Alumnos {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        #Agg-Nombre {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid var(--Border);
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            background-color: var(--Color-base);
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #004a80;
+        }
+
+        .error-message {
+            color: var(--Error);
+            font-weight: bold;
+            min-height: 1.2em;
+        }
+
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--Border);
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .nombre-estudiante {
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .score-input {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid var(--Border);
+            border-radius: 5px;
+        }
+
+        .delete-btn {
+            background-color: #dc3545;
+        }
+
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+
+        .status-badge {
+            font-weight: bold;
+        }
+
+        .aprobado {
+            background-color: var(--Aprobado-fondo);
+            color: var(--Aprobado);
+        }
+
+        .reprobado {
+            background-color: var(--Reprobado-fondo);
+            color: var(--Reprobado);
+        }
+
+
+        #Promedio {
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin-top: 2em;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .container { padding: 1em; }
+            #add-student-form { flex-direction: column; }
+            button { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gestor de Calificaciones</h1>
+        </header>
+
+        <main>
+            <section>
+                <h2>Agregar Alumno</h2>
+                <form id="Agregar-Alumnos">
+                    <input type="text" id="Agg-Nombre" placeholder="Nombre del alumno" required>
+                    <button type="submit">Agregar</button>
+                </form>
+                <p id="Mensaje-Error" class="error-message"></p>
+            </section>
+
+            <section>
+                <h2>Lista de Alumnos</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre (doble clic para editar)</th>
+                                <th>Calificación (0-100)</th>
+                                <th>Estatus</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ListadeEstudiantes">
+                            </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <p id="Promedio">Agrega alumnos para comenzar.</p>
+            </section>
+        </main>
+    </div>
+
+    <script>
+       
+        const formularioEstudiante = document.getElementById('Agregar-Alumnos');
+        const entradaNombreEstudiante = document.getElementById('Agg-Nombre');
+        const cuerpoListaEstudiantes = document.getElementById('ListadeEstudiantes');
+        const mensajeError = document.getElementById('Mensaje-Error');
+        const visorPromedio = document.getElementById('Promedio');
+
+
+        const actualizarEstadoYPromedio = () => {
+            const filas = cuerpoListaEstudiantes.querySelectorAll('tr');
+            if (filas.length === 0) {
+                visorPromedio.textContent = 'Agrega alumnos para comenzar.';
+                return;
+            }
+
+            let puntajeTotal = 0;
+            let conteoCalificados = 0;
+            let todasCalificacionesCompletas = true;
+
+            filas.forEach(fila => {
+                const entradaPuntaje = fila.querySelector('.score-input');
+                const celdaEstado = fila.querySelector('.status-badge');
+                const puntaje = entradaPuntaje.value;
+
+                fila.classList.remove('aprobado', 'reprobado');
+                celdaEstado.textContent = 'N/A';
+
+                if (puntaje !== '') {
+                    const puntajeNumerico = parseFloat(puntaje);
+                    conteoCalificados++;
+                    puntajeTotal += puntajeNumerico;
+
+  
+                    if (puntajeNumerico >= 70) {
+                        fila.classList.add('aprobado');
+                        celdaEstado.textContent = 'Aprobado';
+                    } else {
+                        fila.classList.add('reprobado');
+                        celdaEstado.textContent = 'Reprobado';
+                    }
+                } else {
+                    todasCalificacionesCompletas = false; 
+                }
+            });
+
+        
+            if (todasCalificacionesCompletas) {
+                const promedio = filas.length > 0 ? puntajeTotal / filas.length : 0;
+                visorPromedio.textContent = `Promedio del grupo: ${promedio.toFixed(2)}`;
+            } else {
+                visorPromedio.textContent = 'Completa todas las calificaciones para calcular el promedio.';
+            }
+        };
+
+
+        formularioEstudiante.addEventListener('submit', (evento) => {
+            evento.preventDefault();
+            const nombreNuevo = entradaNombreEstudiante.value.trim();
+            mensajeError.textContent = '';
+
+            if (nombreNuevo === '') {
+                mensajeError.textContent = 'El nombre no puede estar vacío.';
+                return;
+            }
+
+            const nombresExistentes = cuerpoListaEstudiantes.querySelectorAll('.nombre-estudiante');
+            let esDuplicado = false;
+            nombresExistentes.forEach(span => {
+                if (span.textContent.toLowerCase() === nombreNuevo.toLowerCase()) {
+                    esDuplicado = true;
+                }
+            });
+
+            if (esDuplicado) {
+                mensajeError.textContent = 'Ya existe un alumno con ese nombre.';
+                return;
+            }
+
+            const fila = document.createElement('tr');
+            fila.innerHTML = `
+                <td><span class="student-name">${nombreNuevo}</span></td>
+                <td><input type="number" class="score-input" min="0" max="100" placeholder="0-100"></td>
+                <td><span class="status-badge">N/A</span></td>
+                <td><button class="delete-btn">Eliminar</button></td>
+            `;
+
+            cuerpoListaEstudiantes.appendChild(fila);
+            entradaNombreEstudiante.value = '';
+            entradaNombreEstudiante.focus();
+            actualizarEstadoYPromedio(); 
+        });
+        
+        
+        cuerpoListaEstudiantes.addEventListener('click', (evento) => {
+  
+            if (evento.target.classList.contains('delete-btn')) {
+                evento.target.closest('tr').remove();
+                actualizarEstadoYPromedio();
+            }
+        });
+        
+        cuerpoListaEstudiantes.addEventListener('input', (evento) => {
+
+            if (evento.target.classList.contains('score-input')) {
+
+                const valor = parseFloat(evento.target.value);
+                if (valor > 100) evento.target.value = 100;
+                if (valor < 0) evento.target.value = 0;
+                
+                actualizarEstadoYPromedio();
+            }
+        });
+
+        cuerpoListaEstudiantes.addEventListener('dblclick', (evento) => {
+
+            if (evento.target.classList.contains('nombre-estudiante')) {
+                const spanNombre = evento.target;
+                const nombreOriginal = spanNombre.textContent;
+                const tdPadre = spanNombre.parentElement;
+
+                const entrada = document.createElement('input');
+                entrada.type = 'text';
+                entrada.value = nombreOriginal;
+                
+                tdPadre.replaceChild(entrada, spanNombre);
+                entrada.focus();
+
+
+                const guardarORevertir = () => {
+                    const nombreNuevo = entrada.value.trim();
+                    
+
+                    if (nombreNuevo === '') {
+                        tdPadre.replaceChild(spanNombre, entrada);
+                        return;
+                    }
+
+                   
+                    let esDuplicado = false;
+                    const todosLosNombres = cuerpoListaEstudiantes.querySelectorAll('.nombre-estudiante');
+                    todosLosNombres.forEach(span => {
+                        if (span.textContent.toLowerCase() === nombreNuevo.toLowerCase()) {
+                            esDuplicado = true;
+                        }
+                    });
+
+                    if (esDuplicado && nombreNuevo.toLowerCase() !== nombreOriginal.toLowerCase()) {
+                        alert('Error: Ya existe un alumno con ese nombre.');
+                        tdPadre.replaceChild(spanNombre, entrada); 
+                    } else {
+                        spanNombre.textContent = nombreNuevo;
+                        tdPadre.replaceChild(spanNombre, entrada);
+                    }
+                };
+
+                entrada.addEventListener('blur', guardarORevertir);
+                entrada.addEventListener('keydown', (evento) => {
+                    if (evento.key === 'Enter') {
+                        entrada.blur();
+                    } else if (evento.key === 'Escape') {
+                        tdPadre.replaceChild(spanNombre, entrada);
+                    }
+                });
+            }
+        });
+
+    </script>
+</body>
+</html>
